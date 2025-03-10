@@ -142,7 +142,24 @@ app.post("/checkout", async (req, res) => {
     We appreciate your business!
     `;
 
+    const orderDetails = `
+    🛍️ New Order Received:
+    ${cart.map(item => `- ${item.quantity} x ${item.title} 
+        - Color: ${item.color} 
+        - Size: ${item.size} 
+        - Line Art: ${item.lineArt} 
+        - Stand: ${item.stand} 
+        - Price: R${item.price.toFixed(2)}
+    `).join("\n")}
+
+    🧾 Total: R${total.toFixed(2)}
+    📌 Transaction ID: ${transactionId}
+    🏠 Shipping Address: ${shippingAddress}
+    ✉️ Customer Email: ${email}
+    `;
+
     try {
+        // Send invoice to the customer
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: email, // Send invoice to customer
@@ -150,13 +167,16 @@ app.post("/checkout", async (req, res) => {
             text: invoiceContent,
         });
 
-        console.log("✅ Invoice email sent successfully!");
+        // Send order details to the admin
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: process.env.EMAIL_USER, // Send order details to admin
+            subject: `🛍️ New Order Received (${transactionId})`,
+            text: orderDetails,
+        });
 
-        // 🔴 **Warning: Render does not support file storage!**
-        // You CANNOT save `transactions.json` on Render (it will reset after redeployment).
-        // Use a **database** (MongoDB, Firebase, Supabase) instead.
-        // Below is an alternative solution:
-        
+        console.log("✅ Invoice and order details emails sent successfully!");
+
         // Store transaction data in an array (temporary solution)
         let transactions = [];
         const filePath = "./transactions.json";
