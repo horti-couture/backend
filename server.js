@@ -83,7 +83,7 @@ app.post("/initialize-payment", async (req, res) => {
 
     try {
         const response = await axios.post(
-            "https://api.paystack.co/transaction/initialize",
+            "https:// api.paystack.co/transaction/initialize",
             { email, amount: amount * 100, currency: "ZAR" }, // Convert amount to kobo
             { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } }
         );
@@ -123,44 +123,44 @@ app.post("/checkout", async (req, res) => {
 
     // Helper function to generate item details
     const generateItemDetails = (item) => {
-        return `
-        - ${item.quantity} x ${item.title}
-        - Color: ${item.color || "N/A"}
-        ${item.size ? `- Size: ${item.size}\n` : ""}
-        ${item.lineArt && item.lineArt !== "Plain" ? `- Line Art: ${item.lineArt}\n` : ""}
-        ${item.stand && item.stand !== "No Stand" ? `- Stand: ${item.stand}\n` : ""}
-        - Price: R${item.price.toFixed(2)}`;
+        let details = `    - ${item.quantity} x ${item.title}\n`;
+        details += `    - Color: ${item.color || "N/A"}\n`;
+        if (item.size) details += `    - Size: ${item.size}\n`;
+        if (item.lineArt && item.lineArt !== "Plain") details += `    - Line Art: ${item.lineArt}\n`;
+        if (item.stand && item.stand !== "No Stand") details += `    - Stand: ${item.stand}\n`;
+        details += `    - Price: R${item.price.toFixed(2)}\n`;
+        return details;
     };
 
     // Generate invoice content
     const invoiceContent = `
-    🛍️ Order Details:
-    ${cart.map(item => generateItemDetails(item)).join("\n")}
+🛍️ Order Details:
+${cart.map(item => generateItemDetails(item)).join("\n")}
 
-    🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
-    🧾 Subtotal: R${total.toFixed(2)}
-    🧾 Shipping Fee: R${shippingFee.toFixed(2)}
-    🧾 Grand Total: R${grandTotal.toFixed(2)}
-    📌 Transaction ID: ${transactionId}
-    🏠 Shipping Address: ${shippingAddress}
-    💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
+🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
+🧾 Subtotal: R${total.toFixed(2)}
+🧾 Shipping Fee: R${shippingFee.toFixed(2)}
+🧾 Grand Total: R${grandTotal.toFixed(2)}
+📌 Transaction ID: ${transactionId}
+🏠 Shipping Address: ${shippingAddress}
+💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
 
-    We appreciate your business!
+We appreciate your business!
     `;
 
     // Generate order details for admin
     const orderDetails = `
-    🛍️ New Order Received:
-    ${cart.map(item => generateItemDetails(item)).join("\n")}
+🛍️ New Order Received:
+${cart.map(item => generateItemDetails(item)).join("\n")}
 
-    🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
-    🧾 Subtotal: R${total.toFixed(2)}
-    🧾 Shipping Fee: R${shippingFee.toFixed(2)}
-    🧾 Grand Total: R${grandTotal.toFixed(2)}
-    📌 Transaction ID: ${transactionId}
-    🏠 Shipping Address: ${shippingAddress}
-    💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
-    ✉️ Customer Email: ${email}
+🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
+🧾 Subtotal: R${total.toFixed(2)}
+🧾 Shipping Fee: R${shippingFee.toFixed(2)}
+🧾 Grand Total: R${grandTotal.toFixed(2)}
+📌 Transaction ID: ${transactionId}
+🏠 Shipping Address: ${shippingAddress}
+💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
+✉️ Customer Email: ${email}
     `;
 
     try {
