@@ -121,17 +121,21 @@ app.post("/checkout", async (req, res) => {
     const shippingFee = shippingOption === "courier" ? 120 : 0;
     const grandTotal = total + shippingFee;
 
+    // Helper function to generate item details
+    const generateItemDetails = (item) => {
+        return `
+        - ${item.quantity} x ${item.title}
+        - Color: ${item.color || "N/A"}
+        ${item.size ? `- Size: ${item.size}\n` : ""}
+        ${item.lineArt && item.lineArt !== "Plain" ? `- Line Art: ${item.lineArt}\n` : ""}
+        ${item.stand && item.stand !== "No Stand" ? `- Stand: ${item.stand}\n` : ""}
+        - Price: R${item.price.toFixed(2)}`;
+    };
+
     // Generate invoice content
     const invoiceContent = `
     🛍️ Order Details:
-    ${cart.map(item => `
-        - ${item.quantity} x ${item.title}
-        - Color: ${item.color || "N/A"}
-        - Size: ${item.size || "N/A"}
-        - Line Art: ${item.lineArt || "N/A"}
-        - Stand: ${item.stand || "N/A"}
-        - Price: R${item.price.toFixed(2)}
-    `).join("\n")}
+    ${cart.map(item => generateItemDetails(item)).join("\n")}
 
     🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
     🧾 Subtotal: R${total.toFixed(2)}
@@ -147,14 +151,7 @@ app.post("/checkout", async (req, res) => {
     // Generate order details for admin
     const orderDetails = `
     🛍️ New Order Received:
-    ${cart.map(item => `
-        - ${item.quantity} x ${item.title}
-        - Color: ${item.color || "N/A"}
-        - Size: ${item.size || "N/A"}
-        - Line Art: ${item.lineArt || "N/A"}
-        - Stand: ${item.stand || "N/A"}
-        - Price: R${item.price.toFixed(2)}
-    `).join("\n")}
+    ${cart.map(item => generateItemDetails(item)).join("\n")}
 
     🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
     🧾 Subtotal: R${total.toFixed(2)}
