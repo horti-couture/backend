@@ -66,14 +66,7 @@ app.post("/book-service", async (req, res) => {
             from: process.env.EMAIL_USER,
             to: process.env.EMAIL_USER, // Send to your email
             subject: `📝 New Booking Request from ${name}`,
-            text: `📌 Service: ${service}
-📅 Date: ${date}
-⏰ Time: ${time}
-👤 Name: ${name}
-✉️ Email: ${email}
-📞 Phone: ${phone}
-🏠 Address: ${address}
-📝 Notes: ${notes || "No additional notes"}`,
+            text: `📌 Service: ${service}\n📅 Date: ${date}\n⏰ Time: ${time}\n👤 Name: ${name}\n✉️ Email: ${email}\n📞 Phone: ${phone}\n🏠 Address: ${address}\n📝 Notes: ${notes || "No additional notes"}`,
         });
 
         console.log("✅ Booking email sent successfully!");
@@ -118,43 +111,58 @@ app.get("/verify-payment/:reference", async (req, res) => {
 
 // ✅ **5. Checkout & Send Invoice**
 app.post("/checkout", async (req, res) => {
-    const { email, cart, total, shippingAddress } = req.body;
+    const { email, cart, total, shippingAddress, shippingOption, paymentMethod } = req.body;
 
-    if (!email || !cart || cart.length === 0 || !total || !shippingAddress) {
+    if (!email || !cart || cart.length === 0 || !total || !shippingAddress || !shippingOption || !paymentMethod) {
         return res.status(400).json({ error: "Invalid checkout request." });
     }
 
     const transactionId = `TXN-${Date.now()}`;
+    const shippingFee = shippingOption === "courier" ? 120 : 0;
+    const grandTotal = total + shippingFee;
+
+    // Generate invoice content
     const invoiceContent = `
     🛍️ Order Details:
-    ${cart.map(item => `- ${item.quantity} x ${item.title} 
-        - Color: ${item.color} 
-        - Size: ${item.size} 
-        - Line Art: ${item.lineArt} 
-        - Stand: ${item.stand} 
+    ${cart.map(item => `
+        - ${item.quantity} x ${item.title}
+        - Color: ${item.color || "N/A"}
+        - Size: ${item.size || "N/A"}
+        - Line Art: ${item.lineArt || "N/A"}
+        - Stand: ${item.stand || "N/A"}
         - Price: R${item.price.toFixed(2)}
     `).join("\n")}
 
-    🧾 Total: R${total.toFixed(2)}
+    🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
+    🧾 Subtotal: R${total.toFixed(2)}
+    🧾 Shipping Fee: R${shippingFee.toFixed(2)}
+    🧾 Grand Total: R${grandTotal.toFixed(2)}
     📌 Transaction ID: ${transactionId}
     🏠 Shipping Address: ${shippingAddress}
+    💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
 
     We appreciate your business!
     `;
 
+    // Generate order details for admin
     const orderDetails = `
     🛍️ New Order Received:
-    ${cart.map(item => `- ${item.quantity} x ${item.title} 
-        - Color: ${item.color} 
-        - Size: ${item.size} 
-        - Line Art: ${item.lineArt} 
-        - Stand: ${item.stand} 
+    ${cart.map(item => `
+        - ${item.quantity} x ${item.title}
+        - Color: ${item.color || "N/A"}
+        - Size: ${item.size || "N/A"}
+        - Line Art: ${item.lineArt || "N/A"}
+        - Stand: ${item.stand || "N/A"}
         - Price: R${item.price.toFixed(2)}
     `).join("\n")}
 
-    🧾 Total: R${total.toFixed(2)}
+    🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
+    🧾 Subtotal: R${total.toFixed(2)}
+    🧾 Shipping Fee: R${shippingFee.toFixed(2)}
+    🧾 Grand Total: R${grandTotal.toFixed(2)}
     📌 Transaction ID: ${transactionId}
     🏠 Shipping Address: ${shippingAddress}
+    💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
     ✉️ Customer Email: ${email}
     `;
 
@@ -183,7 +191,7 @@ app.post("/checkout", async (req, res) => {
         if (fs.existsSync(filePath)) {
             transactions = JSON.parse(fs.readFileSync(filePath));
         }
-        transactions.push({ transactionId, email, cart, total, shippingAddress, date: new Date().toISOString() });
+        transactions.push({ transactionId, email, cart, total, shippingAddress, shippingOption, paymentMethod, date: new Date().toISOString() });
         fs.writeFileSync(filePath, JSON.stringify(transactions, null, 2));
 
         res.status(200).json({ message: "Invoice sent!", transactionId });
