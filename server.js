@@ -111,9 +111,9 @@ app.get("/verify-payment/:reference", async (req, res) => {
 
 // ✅ **5. Checkout & Send Invoice**
 app.post("/checkout", async (req, res) => {
-    const { email, cart, total, shippingAddress, shippingOption, paymentMethod } = req.body;
+    const { email, cart, total, address, shippingOption, paymentMethod } = req.body;
 
-    if (!email || !cart || cart.length === 0 || !total || !shippingAddress || !shippingOption || !paymentMethod) {
+    if (!email || !cart || cart.length === 0 || !total || !address || !shippingOption || !paymentMethod) {
         return res.status(400).json({ error: "Invalid checkout request." });
     }
 
@@ -142,7 +142,7 @@ ${cart.map((item) => generateItemDetails(item)).join("\n")}
 🧾 Shipping Fee: R${shippingFee.toFixed(2)}
 🧾 Grand Total: R${grandTotal.toFixed(2)}
 📌 Transaction ID: ${transactionId}
-🏠 Shipping Address: ${shippingAddress}
+🏠 Shipping Address: ${address}
 💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
 
 We appreciate your business!
@@ -158,7 +158,7 @@ ${cart.map((item) => generateItemDetails(item)).join("\n")}
 🧾 Shipping Fee: R${shippingFee.toFixed(2)}
 🧾 Grand Total: R${grandTotal.toFixed(2)}
 📌 Transaction ID: ${transactionId}
-🏠 Shipping Address: ${shippingAddress}
+🏠 Shipping Address: ${address}
 💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
 ✉️ Customer Email: ${email}
     `;
@@ -188,7 +188,7 @@ ${cart.map((item) => generateItemDetails(item)).join("\n")}
         if (fs.existsSync(filePath)) {
             transactions = JSON.parse(fs.readFileSync(filePath));
         }
-        transactions.push({ transactionId, email, cart, total, shippingAddress, shippingOption, paymentMethod, date: new Date().toISOString() });
+        transactions.push({ transactionId, email, cart, total, address, shippingOption, paymentMethod, date: new Date().toISOString() });
         fs.writeFileSync(filePath, JSON.stringify(transactions, null, 2));
 
         res.status(200).json({ message: "Invoice sent!", transactionId });
