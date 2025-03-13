@@ -47,7 +47,7 @@ app.post("/send-email", async (req, res) => {
 
         console.log("✅ Contact email sent successfully!");
         res.status(200).json({ message: "Email sent successfully!" });
-    } catch (error) {
+    } catch ( error) {
         console.error("❌ Error sending contact email:", error);
         res.status(500).json({ error: "Failed to send email" });
     }
@@ -199,12 +199,6 @@ ${cart.map((item) => generateItemDetails(item)).join("\n")}
 });
 
 // ✅ **6. Start Server**
-const startServer = async () => {
-    try {
-        app.listen(PORT, () => {
-            console.log(`✅ Backend running on http://localhost:${PORT}`);
-        });
-    } catch (error) {
-        console.error("❌ Failed to start the server:", error);
-    }
-};
+app.listen(PORT, () => {
+    console.log(`✅ Backend running on http://localhost:${PORT}`);
+});
