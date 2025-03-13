@@ -123,18 +123,19 @@ app.post("/checkout", async (req, res) => {
 
     // Helper function to generate item details
     const generateItemDetails = (item) => {
-    let details = `    - ${item.quantity} x ${item.title}\n`; // Use item.quantity instead of hardcoded '1'
-    details += `    - Color: ${item.color || "N/A"}\n`;
-    if (item.size) details += `    - Size: ${item.size}\n`;
-    if (item.lineArt && item.lineArt !== "Plain") details += `    - Line Art: ${item.lineArt}\n`;
-    if (item.stand && item.stand !== "No Stand") details += `    - Stand: ${item.stand}\n`;
-    details += `    - Price: R${(item.price * item.quantity).toFixed(2)}\n`; // Calculate total price for the item
-    return details;
+        let details = `    - ${item.quantity} x ${item.title}\n`; // Use item.quantity instead of hardcoded '1'
+        details += `    - Color: ${item.color || "N/A"}\n`;
+        if (item.size) details += `    - Size: ${item.size}\n`;
+        if (item.lineArt && item.lineArt !== "Plain") details += `    - Line Art: ${item.lineArt}\n`;
+        if (item.stand && item.stand !== "No Stand") details += `    - Stand: ${item.stand}\n`;
+        details += `    - Price: R${(item.price * item.quantity).toFixed(2)}\n`; // Calculate total price for the item
+        return details;
+    };
 
     // Generate invoice content
     const invoiceContent = `
 🛍️ Order Details:
-${cart.map(item => generateItemDetails(item)).join("\n")}
+${cart.map((item) => generateItemDetails(item)).join("\n")}
 
 🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
 🧾 Subtotal: R${total.toFixed(2)}
@@ -150,7 +151,7 @@ We appreciate your business!
     // Generate order details for admin
     const orderDetails = `
 🛍️ New Order Received:
-${cart.map(item => generateItemDetails(item)).join("\n")}
+${cart.map((item) => generateItemDetails(item)).join("\n")}
 
 🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
 🧾 Subtotal: R${total.toFixed(2)}
@@ -198,6 +199,12 @@ ${cart.map(item => generateItemDetails(item)).join("\n")}
 });
 
 // ✅ **6. Start Server**
-app.listen(PORT, () => {
-    console.log(`✅ Backend running on http://localhost:${PORT}`);
-});
+const startServer = async () => {
+    try {
+        app.listen(PORT, () => {
+            console.log(`✅ Backend running on http://localhost:${PORT}`);
+        });
+    } catch (error) {
+        console.error("❌ Failed to start the server:", error);
+    }
+};
