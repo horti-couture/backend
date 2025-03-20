@@ -47,7 +47,7 @@ app.post("/send-email", async (req, res) => {
 
         console.log("✅ Contact email sent successfully!");
         res.status(200).json({ message: "Email sent successfully!" });
-    } catch (error) {
+    } catch ( error) {
         console.error("❌ Error sending contact email:", error);
         res.status(500).json({ error: "Failed to send email" });
     }
@@ -111,9 +111,9 @@ app.get("/verify-payment/:reference", async (req, res) => {
 
 // ✅ **5. Checkout & Send Invoice**
 app.post("/checkout", async (req, res) => {
-    const { name, email, cart, total, address, shippingOption, paymentMethod } = req.body;
+    const { email, cart, total, address, shippingOption, paymentMethod } = req.body;
 
-    if (!name || !email || !cart || cart.length === 0 || !total || !address || !shippingOption || !paymentMethod) {
+    if (!email || !cart || cart.length === 0 || !total || !address || !shippingOption || !paymentMethod) {
         return res.status(400).json({ error: "Invalid checkout request." });
     }
 
@@ -135,7 +135,6 @@ app.post("/checkout", async (req, res) => {
     // Generate invoice content
     const invoiceContent = `
 🛍️ Order Details:
-👤 Customer Name: ${name}
 ${cart.map((item) => generateItemDetails(item)).join("\n")}
 
 🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
@@ -152,7 +151,6 @@ We appreciate your business!
     // Generate order details for admin
     const orderDetails = `
 🛍️ New Order Received:
-👤 Customer Name: ${name}
 ${cart.map((item) => generateItemDetails(item)).join("\n")}
 
 🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
@@ -183,6 +181,15 @@ ${cart.map((item) => generateItemDetails(item)).join("\n")}
         });
 
         console.log("✅ Invoice and order details emails sent successfully!");
+
+        // Store transaction data in an array (temporary solution)
+        let transactions = [];
+        const filePath = "./transactions.json";
+        if (fs.existsSync(filePath)) {
+            transactions = JSON.parse(fs.readFileSync(filePath));
+        }
+        transactions.push({ transactionId, email, cart, total, address, shippingOption, paymentMethod, date: new Date().toISOString() });
+        fs.writeFileSync(filePath, JSON.stringify(transactions, null, 2));
 
         res.status(200).json({ message: "Invoice sent!", transactionId });
     } catch (error) {
