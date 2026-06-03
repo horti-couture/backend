@@ -2,34 +2,64 @@ require("dotenv").config();
 const express = require("express");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
-const fs = require("fs");
 const axios = require("axios");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// ========================
 // Middleware
+// ========================
 app.use(express.json());
 app.use(cors());
 
-// Debugging Logs
+// ========================
+// Debug Logs
+// ========================
 console.log("Loaded Email:", process.env.EMAIL_USER);
 console.log("Password Status:", process.env.EMAIL_PASS ? "Loaded" : "Not Loaded");
 
-// Paystack API Keys from Environment Variables
+// ========================
+// Paystack Keys
+// ========================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY;
 
-// Nodemailer Transporter
+// ========================
+// ROOT TEST ROUTE (fixes Cannot GET /)
+// ========================
+app.get("/", (req, res) => {
+    res.send("✅ Horti Couture Backend is running");
+});
+
+// ========================
+// Nodemailer (FIXED SMTP CONFIG)
+// ========================
 const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 30000,
+    socketTimeout: 30000,
 });
 
-// ✅ **1. Contact Form Endpoint**
+// ========================
+// SMTP STARTUP TEST (VERY IMPORTANT)
+// ========================
+transporter.verify((error, success) => {
+    if (error) {
+        console.error("❌ SMTP ERROR:", error);
+    } else {
+        console.log("✅ SMTP READY - Gmail connected successfully");
+    }
+});
+
+// ========================
+// 1. CONTACT EMAIL
+// ========================
 app.post("/send-email", async (req, res) => {
     const { name, email, message } = req.body;
 
@@ -40,158 +70,165 @@ app.post("/send-email", async (req, res) => {
     try {
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER, // Send to your email
+            to: process.env.EMAIL_USER,
             subject: `New Contact Form Submission from ${name}`,
-            text: `👤 Name: ${name}\n✉️ Email: ${email}\n📝 Message:\n${message}`,
+            text: `Name: ${name}\nEmail: ${email}\nMessage:\n${message}`,
         });
 
-        console.log("✅ Contact email sent successfully!");
-        res.status(200).json({ message: "Email sent successfully!" });
+        console.log("✅ Contact email sent");
+        res.json({ message: "Email sent successfully" });
     } catch (error) {
-        console.error("❌ Error sending contact email:", error);
-        res.status(500).json({ error: "Failed to send email" });
+        console.error("❌ Contact email error:", error);
+        res.status(500).json({ error: "Email failed" });
     }
 });
 
-// ✅ **2. Booking Service Endpoint**
+// ========================
+// 2. BOOKING EMAIL
+// ========================
 app.post("/book-service", async (req, res) => {
     const { service, date, time, name, email, phone, address, notes } = req.body;
 
     if (!service || !date || !time || !name || !email || !phone || !address) {
-        return res.status(400).json({ error: "All required fields must be filled." });
+        return res.status(400).json({ error: "Missing required fields." });
     }
 
     try {
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER, // Send to your email
-            subject: `📝 New Booking Request from ${name}`,
-            text: `📌 Service: ${service}\n📅 Date: ${date}\n⏰ Time: ${time}\n👤 Name: ${name}\n✉️ Email: ${email}\n📞 Phone: ${phone}\n🏠 Address: ${address}\n📝 Notes: ${notes || "No additional notes"}`,
+            to: process.env.EMAIL_USER,
+            subject: `New Booking from ${name}`,
+            text:
+                `Service: ${service}\n` +
+                `Date: ${date}\nTime: ${time}\n` +
+                `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\n` +
+                `Address: ${address}\nNotes: ${notes || "None"}`,
         });
 
-        console.log("✅ Booking email sent successfully!");
-        res.status(200).json({ message: "Booking request sent successfully!" });
+        console.log("✅ Booking email sent");
+        res.json({ message: "Booking sent" });
     } catch (error) {
-        console.error("❌ Error sending booking email:", error);
-        res.status(500).json({ error: "Failed to send booking request" });
+        console.error("❌ Booking error:", error);
+        res.status(500).json({ error: "Booking failed" });
     }
 });
 
-// ✅ **3. Initialize Paystack Payment**
+// ========================
+// 3. PAYSTACK INIT
+// ========================
 app.post("/initialize-payment", async (req, res) => {
     const { email, amount } = req.body;
 
     try {
         const response = await axios.post(
             "https://api.paystack.co/transaction/initialize",
-            { email, amount: amount * 100, currency: "ZAR" }, // Convert amount to kobo
-            { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } }
+            {
+                email,
+                amount: amount * 100,
+                currency: "ZAR",
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+                },
+            }
         );
 
         res.json(response.data);
     } catch (error) {
-        console.error("❌ Error initializing payment:", error);
-        res.status(500).json({ error: error.response?.data?.message || "Payment initialization failed" });
+        console.error("❌ Paystack init error:", error.response?.data || error);
+        res.status(500).json({ error: "Payment init failed" });
     }
 });
 
-// ✅ **4. Verify Paystack Transaction**
+// ========================
+// 4. PAYSTACK VERIFY
+// ========================
 app.get("/verify-payment/:reference", async (req, res) => {
     try {
-        const response = await axios.get(`https://api.paystack.co/transaction/verify/${req.params.reference}`, {
-            headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
-        });
+        const response = await axios.get(
+            `https://api.paystack.co/transaction/verify/${req.params.reference}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+                },
+            }
+        );
 
         res.json(response.data);
     } catch (error) {
-        console.error("❌ Error verifying payment:", error);
+        console.error("❌ Verify error:", error.response?.data || error);
         res.status(500).json({ error: "Verification failed" });
     }
 });
 
-// ✅ **5. Checkout & Send Invoice**
+// ========================
+// 5. CHECKOUT + INVOICE
+// ========================
 app.post("/checkout", async (req, res) => {
     const { name, email, cart, total, address, shippingOption, paymentMethod } = req.body;
 
-    if (!name || !email || !cart || cart.length === 0 || !total || !address || !shippingOption || !paymentMethod) {
-        return res.status(400).json({ error: "Invalid checkout request." });
+    if (!name || !email || !cart || cart.length === 0 || !total || !address || !shippingOption) {
+        return res.status(400).json({ error: "Invalid checkout request" });
     }
 
     const transactionId = `TXN-${Date.now()}`;
     const shippingFee = shippingOption === "courier" ? 120 : 0;
     const grandTotal = total + shippingFee;
 
-    // Helper function to generate item details
-    const generateItemDetails = (item) => {
-        let details = `    - ${item.quantity} x ${item.title}\n`; // Use item.quantity instead of hardcoded '1'
-        details += `    - Color: ${item.color || "N/A"}\n`;
-        if (item.size) details += `    - Size: ${item.size}\n`;
-        if (item.lineArt && item.lineArt !== "Plain") details += `    - Line Art: ${item.lineArt}\n`;
-        if (item.stand && item.stand !== "No Stand") details += `    - Stand: ${item.stand}\n`;
-        details += `    - Price: R${(item.price * item.quantity).toFixed(2)}\n`; // Calculate total price for the item
-        return details;
+    const formatItem = (item) => {
+        return (
+            `- ${item.quantity} x ${item.title}\n` +
+            `  Color: ${item.color || "N/A"}\n` +
+            `  Size: ${item.size || "N/A"}\n` +
+            `  Price: R${(item.price * item.quantity).toFixed(2)}\n`
+        );
     };
 
-    // Generate invoice content
-    const invoiceContent = `
-🛍️ Order Details:
-👤 Customer Name: ${name}
-${cart.map((item) => generateItemDetails(item)).join("\n")}
+    const invoice = `
+🛍️ ORDER INVOICE
+Customer: ${name}
 
-🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
-🧾 Subtotal: R${total.toFixed(2)}
-🧾 Shipping Fee: R${shippingFee.toFixed(2)}
-🧾 Grand Total: R${grandTotal.toFixed(2)}
-📌 Transaction ID: ${transactionId}
-🏠 Shipping Address: ${address}
-💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
+${cart.map(formatItem).join("\n")}
 
-We appreciate your business!
-    `;
+Shipping: ${shippingOption}
+Subtotal: R${total.toFixed(2)}
+Shipping Fee: R${shippingFee.toFixed(2)}
+TOTAL: R${grandTotal.toFixed(2)}
 
-    // Generate order details for admin
-    const orderDetails = `
-🛍️ New Order Received:
-👤 Customer Name: ${name}
-${cart.map((item) => generateItemDetails(item)).join("\n")}
-
-🚚 Shipping Option: ${shippingOption === "courier" ? "Courier (R120)" : "Pickup from Factory"}
-🧾 Subtotal: R${total.toFixed(2)}
-🧾 Shipping Fee: R${shippingFee.toFixed(2)}
-🧾 Grand Total: R${grandTotal.toFixed(2)}
-📌 Transaction ID: ${transactionId}
-🏠 Shipping Address: ${address}
-💳 Payment Method: ${paymentMethod === "paystack" ? "Paystack" : "EFT"}
-✉️ Customer Email: ${email}
-    `;
+Transaction ID: ${transactionId}
+Address: ${address}
+Payment: ${paymentMethod}
+`;
 
     try {
-        // Send invoice to the customer
+        // customer email
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
-            to: email, // Send invoice to customer
-            subject: "🧾 Your Invoice from Our Store",
-            text: invoiceContent,
+            to: email,
+            subject: "Your Order Invoice",
+            text: invoice,
         });
 
-        // Send order details to the admin
+        // admin email
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER, // Send order details to admin
-            subject: `🛍️ New Order Received (${transactionId})`,
-            text: orderDetails,
+            to: process.env.EMAIL_USER,
+            subject: `New Order ${transactionId}`,
+            text: invoice,
         });
 
-        console.log("✅ Invoice and order details emails sent successfully!");
-
-        res.status(200).json({ message: "Invoice sent!", transactionId });
+        console.log("✅ Checkout complete");
+        res.json({ message: "Order processed", transactionId });
     } catch (error) {
-        console.error("❌ Error processing checkout:", error);
-        res.status(500).json({ error: "Failed to process checkout." });
+        console.error("❌ Checkout error:", error);
+        res.status(500).json({ error: "Checkout failed" });
     }
 });
 
-// ✅ **6. Start Server**
+// ========================
+// START SERVER
+// ========================
 app.listen(PORT, () => {
-    console.log(`✅ Backend running on http://localhost:${PORT}`);
+    console.log(`✅ Server running on port ${PORT}`);
 });
