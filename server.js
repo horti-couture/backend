@@ -17,35 +17,32 @@ app.use(cors());
 // Debug
 // ========================
 console.log("Resend Key Loaded:", process.env.RESEND_API_KEY ? "YES" : "NO");
+console.log("Paystack Key Loaded:", process.env.PAYSTACK_SECRET_KEY ? "YES" : "NO");
 
 // ========================
-// Paystack
+// Services
 // ========================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-
-// ========================
-// Resend
-// ========================
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// 🔥 FORCE EVERYTHING TO YOUR VERIFIED EMAIL (IMPORTANT FIX)
+// FORCE ADMIN EMAIL
 const ADMIN_EMAIL = "thornhill_mt@hotmail.co.uk";
 
 // ========================
-// ROOT
+// ROOT TEST
 // ========================
 app.get("/", (req, res) => {
     res.send("✅ Horti Couture Backend is running");
 });
 
-// ========================
-// CONTACT EMAIL
-// ========================
+// ======================================================
+// 1. CONTACT EMAIL
+// ======================================================
 app.post("/send-email", async (req, res) => {
     const { name, email, message } = req.body;
 
     if (!name || !email || !message) {
-        return res.status(400).json({ error: "All fields are required." });
+        return res.status(400).json({ error: "Missing fields" });
     }
 
     try {
@@ -62,23 +59,22 @@ app.post("/send-email", async (req, res) => {
         });
 
         console.log("✅ CONTACT EMAIL SENT:", result);
-
-        res.json({ message: "Email sent successfully" });
+        res.json({ message: "Email sent" });
 
     } catch (error) {
-        console.error("❌ Contact email error:", error);
-        res.status(500).json({ error: "Email failed" });
+        console.error("❌ CONTACT EMAIL ERROR:", error);
+        res.status(500).json({ error: "Contact email failed" });
     }
 });
 
-// ========================
-// BOOKING EMAIL
-// ========================
+// ======================================================
+// 2. BOOKING EMAIL
+// ======================================================
 app.post("/book-service", async (req, res) => {
     const { service, date, time, name, email, phone, address, notes } = req.body;
 
     if (!service || !date || !time || !name || !email || !phone || !address) {
-        return res.status(400).json({ error: "Missing required fields." });
+        return res.status(400).json({ error: "Missing booking fields" });
     }
 
     try {
@@ -100,18 +96,17 @@ app.post("/book-service", async (req, res) => {
         });
 
         console.log("✅ BOOKING EMAIL SENT:", result);
-
         res.json({ message: "Booking sent" });
 
     } catch (error) {
-        console.error("❌ Booking error:", error);
+        console.error("❌ BOOKING ERROR:", error);
         res.status(500).json({ error: "Booking failed" });
     }
 });
 
-// ========================
-// PAYSTACK INIT
-// ========================
+// ======================================================
+// 3. PAYSTACK INIT
+// ======================================================
 app.post("/initialize-payment", async (req, res) => {
     const { email, amount } = req.body;
 
@@ -133,14 +128,14 @@ app.post("/initialize-payment", async (req, res) => {
         res.json(response.data);
 
     } catch (error) {
-        console.error("❌ Paystack init error:", error.response?.data || error);
+        console.error("❌ PAYSTACK INIT ERROR:", error.response?.data || error);
         res.status(500).json({ error: "Payment init failed" });
     }
 });
 
-// ========================
-// PAYSTACK VERIFY
-// ========================
+// ======================================================
+// 4. PAYSTACK VERIFY
+// ======================================================
 app.get("/verify-payment/:reference", async (req, res) => {
     try {
         const response = await axios.get(
@@ -155,18 +150,20 @@ app.get("/verify-payment/:reference", async (req, res) => {
         res.json(response.data);
 
     } catch (error) {
-        console.error("❌ Verify error:", error.response?.data || error);
+        console.error("❌ VERIFY ERROR:", error.response?.data || error);
         res.status(500).json({ error: "Verification failed" });
     }
 });
 
-// ========================
-// CHECKOUT
-// ========================
+// ======================================================
+// 5. CHECKOUT (FIXED + DEBUG SAFE)
+// ======================================================
 app.post("/checkout", async (req, res) => {
     const { name, email, cart, total, address, shippingOption, paymentMethod } = req.body;
 
-    if (!name || !email || !cart || cart.length === 0 || !total || !address || !shippingOption) {
+    console.log("🧾 CHECKOUT REQUEST RECEIVED:", req.body);
+
+    if (!name || !email || !cart || !Array.isArray(cart) || cart.length === 0 || !total || !address || !shippingOption) {
         return res.status(400).json({ error: "Invalid checkout request" });
     }
 
@@ -174,19 +171,18 @@ app.post("/checkout", async (req, res) => {
     const shippingFee = shippingOption === "courier" ? 120 : 0;
     const grandTotal = total + shippingFee;
 
-    const formatItem = (item) => {
-        return `- ${item.quantity} x ${item.title}
+    const invoiceLines = cart.map(item =>
+        `- ${item.quantity} x ${item.title}
   Color: ${item.color || "N/A"}
   Size: ${item.size || "N/A"}
-  Price: R${(item.price * item.quantity).toFixed(2)}
-`;
-    };
+  Price: R${(item.price * item.quantity).toFixed(2)}`
+    ).join("\n");
 
     const invoice = `
 🛍️ ORDER INVOICE
 Customer: ${name}
 
-${cart.map(formatItem).join("\n")}
+${invoiceLines}
 
 Shipping: ${shippingOption}
 Subtotal: R${total.toFixed(2)}
@@ -195,26 +191,34 @@ TOTAL: R${grandTotal.toFixed(2)}
 
 Transaction ID: ${transactionId}
 Address: ${address}
-Payment: ${paymentMethod}
+Payment: ${paymentMethod || "Not specified"}
 `;
 
     try {
-        await resend.emails.send({
+        const result = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
             to: ADMIN_EMAIL,
             subject: `New Order ${transactionId}`,
             html: `<pre>${invoice}</pre>`,
         });
 
+        console.log("✅ CHECKOUT EMAIL SENT:", result);
+
+        if (result?.error) {
+            console.error("❌ RESEND CHECKOUT ERROR:", result.error);
+        }
+
         res.json({ message: "Order processed", transactionId });
 
     } catch (error) {
-        console.error("❌ Checkout error:", error);
+        console.error("❌ CHECKOUT ERROR FULL:", error);
         res.status(500).json({ error: "Checkout failed" });
     }
 });
 
-// ========================
+// ======================================================
+// START SERVER
+// ======================================================
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
 });
