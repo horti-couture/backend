@@ -1,4 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment variables
 .env
+
+# Windows junk files
+.DS_Store
+Thumbs.db
+
+# Your local backup files
 server - Copy.js
+server - Copy (2).js
+server.zip
+
+# Batch scripts (optional to ignore if they are local only)
 update to git.bat
 start.bat
