@@ -47,18 +47,25 @@ app.post("/send-email", async (req, res) => {
     }
 
     try {
-        await resend.emails.send({
+        const result = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
             to: ADMIN_EMAIL,
             subject: `New Contact Form Submission from ${name}`,
-            text: `Name: ${name}\nEmail: ${email}\nMessage:\n${message}`,
+            html: `
+                <h2>New Contact Message</h2>
+                <p><b>Name:</b> ${name}</p>
+                <p><b>Email:</b> ${email}</p>
+                <p><b>Message:</b><br>${message}</p>
+            `,
         });
 
-        console.log("✅ Contact email sent");
+        console.log("✅ CONTACT EMAIL SENT:", result);
+
         res.json({ message: "Email sent successfully" });
 
     } catch (error) {
-        console.error("❌ Contact email error:", error);
+        console.error("❌ Contact email error:");
+        console.error(error?.response || error);
         res.status(500).json({ error: "Email failed" });
     }
 });
@@ -74,22 +81,30 @@ app.post("/book-service", async (req, res) => {
     }
 
     try {
-        await resend.emails.send({
+        const result = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
             to: ADMIN_EMAIL,
             subject: `New Booking from ${name}`,
-            text:
-                `Service: ${service}\n` +
-                `Date: ${date}\nTime: ${time}\n` +
-                `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\n` +
-                `Address: ${address}\nNotes: ${notes || "None"}`,
+            html: `
+                <h2>New Booking</h2>
+                <p><b>Service:</b> ${service}</p>
+                <p><b>Date:</b> ${date}</p>
+                <p><b>Time:</b> ${time}</p>
+                <p><b>Name:</b> ${name}</p>
+                <p><b>Email:</b> ${email}</p>
+                <p><b>Phone:</b> ${phone}</p>
+                <p><b>Address:</b> ${address}</p>
+                <p><b>Notes:</b> ${notes || "None"}</p>
+            `,
         });
 
-        console.log("✅ Booking email sent");
+        console.log("✅ BOOKING EMAIL SENT:", result);
+
         res.json({ message: "Booking sent" });
 
     } catch (error) {
-        console.error("❌ Booking error:", error);
+        console.error("❌ Booking error:");
+        console.error(error?.response || error);
         res.status(500).json({ error: "Booking failed" });
     }
 });
@@ -160,12 +175,11 @@ app.post("/checkout", async (req, res) => {
     const grandTotal = total + shippingFee;
 
     const formatItem = (item) => {
-        return (
-            `- ${item.quantity} x ${item.title}\n` +
-            `  Color: ${item.color || "N/A"}\n` +
-            `  Size: ${item.size || "N/A"}\n` +
-            `  Price: R${(item.price * item.quantity).toFixed(2)}\n`
-        );
+        return `- ${item.quantity} x ${item.title}
+  Color: ${item.color || "N/A"}
+  Size: ${item.size || "N/A"}
+  Price: R${(item.price * item.quantity).toFixed(2)}
+`;
     };
 
     const invoice = `
@@ -185,27 +199,27 @@ Payment: ${paymentMethod}
 `;
 
     try {
-        // Customer email
-        await resend.emails.send({
+        const customerEmail = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
             to: email,
             subject: "Your Order Invoice",
-            text: invoice,
+            html: `<pre>${invoice}</pre>`,
         });
 
-        // Admin email
-        await resend.emails.send({
+        const adminEmail = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
             to: ADMIN_EMAIL,
             subject: `New Order ${transactionId}`,
-            text: invoice,
+            html: `<pre>${invoice}</pre>`,
         });
 
-        console.log("✅ Checkout complete");
+        console.log("✅ CHECKOUT COMPLETE:", { customerEmail, adminEmail });
+
         res.json({ message: "Order processed", transactionId });
 
     } catch (error) {
-        console.error("❌ Checkout error:", error);
+        console.error("❌ Checkout error:");
+        console.error(error?.response || error);
         res.status(500).json({ error: "Checkout failed" });
     }
 });
