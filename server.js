@@ -14,10 +14,10 @@ app.use(express.json());
 app.use(cors());
 
 // ========================
-// Debug Startup
+// Debug
 // ========================
-console.log("Resend Loaded:", process.env.RESEND_API_KEY ? "YES" : "NO");
-console.log("Paystack Loaded:", process.env.PAYSTACK_SECRET_KEY ? "YES" : "NO");
+console.log("Resend Loaded:", !!process.env.RESEND_API_KEY);
+console.log("Paystack Loaded:", !!process.env.PAYSTACK_SECRET_KEY);
 
 // ========================
 // Services
@@ -25,11 +25,11 @@ console.log("Paystack Loaded:", process.env.PAYSTACK_SECRET_KEY ? "YES" : "NO");
 const resend = new Resend(process.env.RESEND_API_KEY);
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
-// FORCE ADMIN EMAIL
+// 🔥 ALWAYS SAFE ADMIN EMAIL
 const ADMIN_EMAIL = "thornhill_mt@hotmail.co.uk";
 
 // ========================
-// ROOT TEST
+// ROOT
 // ========================
 app.get("/", (req, res) => {
     res.send("✅ Horti Couture Backend is running");
@@ -49,7 +49,7 @@ app.post("/send-email", async (req, res) => {
         const result = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
             to: ADMIN_EMAIL,
-            subject: `New Contact Form Submission from ${name}`,
+            subject: `Contact Form - ${name}`,
             html: `
                 <h2>New Contact Message</h2>
                 <p><b>Name:</b> ${name}</p>
@@ -59,10 +59,10 @@ app.post("/send-email", async (req, res) => {
         });
 
         console.log("✅ CONTACT EMAIL SENT:", result);
-        res.json({ message: "Email sent" });
+        res.json({ success: true });
 
-    } catch (error) {
-        console.error("❌ CONTACT ERROR:", error);
+    } catch (err) {
+        console.error("❌ CONTACT ERROR:", err);
         res.status(500).json({ error: "Contact failed" });
     }
 });
@@ -81,7 +81,7 @@ app.post("/book-service", async (req, res) => {
         const result = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
             to: ADMIN_EMAIL,
-            subject: `New Booking from ${name}`,
+            subject: `Booking - ${name}`,
             html: `
                 <h2>New Booking</h2>
                 <p><b>Service:</b> ${service}</p>
@@ -96,10 +96,10 @@ app.post("/book-service", async (req, res) => {
         });
 
         console.log("✅ BOOKING EMAIL SENT:", result);
-        res.json({ message: "Booking sent" });
+        res.json({ success: true });
 
-    } catch (error) {
-        console.error("❌ BOOKING ERROR:", error);
+    } catch (err) {
+        console.error("❌ BOOKING ERROR:", err);
         res.status(500).json({ error: "Booking failed" });
     }
 });
@@ -127,8 +127,8 @@ app.post("/initialize-payment", async (req, res) => {
 
         res.json(response.data);
 
-    } catch (error) {
-        console.error("❌ PAYSTACK INIT ERROR:", error.response?.data || error);
+    } catch (err) {
+        console.error("❌ PAYSTACK INIT ERROR:", err.response?.data || err);
         res.status(500).json({ error: "Payment init failed" });
     }
 });
@@ -149,40 +149,39 @@ app.get("/verify-payment/:reference", async (req, res) => {
 
         res.json(response.data);
 
-    } catch (error) {
-        console.error("❌ VERIFY ERROR:", error.response?.data || error);
+    } catch (err) {
+        console.error("❌ VERIFY ERROR:", err.response?.data || err);
         res.status(500).json({ error: "Verification failed" });
     }
 });
 
 // ======================================================
-// 5. CHECKOUT (FIXED EFT + BULLETPROOF LOGGING)
+// 5. CHECKOUT (BULLETPROOF FIXED VERSION)
 // ======================================================
 app.post("/checkout", async (req, res) => {
     const { name, email, cart, total, address, shippingOption, paymentMethod } = req.body;
 
     console.log("🧾 CHECKOUT RECEIVED:", req.body);
 
-    if (!name || !cart || !Array.isArray(cart) || cart.length === 0 || !total || !address || !shippingOption) {
+    if (!name || !Array.isArray(cart) || cart.length === 0 || !total || !address || !shippingOption) {
         return res.status(400).json({ error: "Invalid checkout request" });
     }
 
-    // 🔥 FIX: fallback email logic
-    const recipientEmail =
+    const safeEmail =
         email && email.trim().length > 0
             ? email
-            : "thornhill_mt@hotmail.co.uk"; // fallback admin email
+            : null;
 
     const transactionId = `TXN-${Date.now()}`;
     const shippingFee = shippingOption === "courier" ? 120 : 0;
     const grandTotal = total + shippingFee;
 
-    const invoiceLines = cart.map(item =>
+    const invoiceLines = cart.map(item => (
         `- ${item.quantity} x ${item.title}
   Color: ${item.color || "N/A"}
   Size: ${item.size || "N/A"}
   Price: R${(item.price * item.quantity).toFixed(2)}`
-    ).join("\n");
+    )).join("\n");
 
     const invoice = `
 🛍️ ORDER INVOICE
@@ -197,37 +196,45 @@ TOTAL: R${grandTotal.toFixed(2)}
 
 Transaction ID: ${transactionId}
 Address: ${address}
-Payment: ${paymentMethod || "Not specified"}
+Payment: ${paymentMethod || "N/A"}
 `;
 
     try {
-        // CUSTOMER EMAIL (ONLY IF VALID)
-        if (email && email.trim().length > 0) {
-            await resend.emails.send({
-                from: "Horti Couture <onboarding@resend.dev>",
-                to: email,
-                subject: "Your Order Invoice",
-                html: `<pre>${invoice}</pre>`,
-            });
-        }
-
-        // ADMIN ALWAYS GETS IT
-        const result = await resend.emails.send({
+        // 1. ALWAYS SEND ADMIN EMAIL (GUARANTEED DELIVERY)
+        const adminResult = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
-            to: "thornhill_mt@hotmail.co.uk",
+            to: ADMIN_EMAIL,
             subject: `New Order ${transactionId}`,
             html: `<pre>${invoice}</pre>`,
         });
 
-        console.log("✅ CHECKOUT EMAIL SENT:", result);
+        console.log("✅ ADMIN EMAIL SENT:", adminResult);
 
-        res.json({ message: "Order processed", transactionId });
+        // 2. CUSTOMER EMAIL ONLY IF VALID
+        if (safeEmail) {
+            const customerResult = await resend.emails.send({
+                from: "Horti Couture <onboarding@resend.dev>",
+                to: safeEmail,
+                subject: "Your Order Invoice",
+                html: `<pre>${invoice}</pre>`,
+            });
 
-    } catch (error) {
-        console.error("❌ CHECKOUT ERROR:", error);
+            console.log("✅ CUSTOMER EMAIL SENT:", customerResult);
+        } else {
+            console.log("⚠️ No customer email provided - skipped");
+        }
+
+        res.json({
+            success: true,
+            transactionId,
+        });
+
+    } catch (err) {
+        console.error("❌ CHECKOUT ERROR:", err);
         res.status(500).json({ error: "Checkout failed" });
     }
 });
+
 // ========================
 // START SERVER
 // ========================
