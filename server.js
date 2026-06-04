@@ -14,16 +14,16 @@ app.use(express.json());
 app.use(cors());
 
 // ========================
-// Debug
+// Debug Startup
 // ========================
-console.log("Resend Key Loaded:", process.env.RESEND_API_KEY ? "YES" : "NO");
-console.log("Paystack Key Loaded:", process.env.PAYSTACK_SECRET_KEY ? "YES" : "NO");
+console.log("Resend Loaded:", process.env.RESEND_API_KEY ? "YES" : "NO");
+console.log("Paystack Loaded:", process.env.PAYSTACK_SECRET_KEY ? "YES" : "NO");
 
 // ========================
 // Services
 // ========================
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const resend = new Resend(process.env.RESEND_API_KEY);
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
 // FORCE ADMIN EMAIL
 const ADMIN_EMAIL = "thornhill_mt@hotmail.co.uk";
@@ -62,8 +62,8 @@ app.post("/send-email", async (req, res) => {
         res.json({ message: "Email sent" });
 
     } catch (error) {
-        console.error("❌ CONTACT EMAIL ERROR:", error);
-        res.status(500).json({ error: "Contact email failed" });
+        console.error("❌ CONTACT ERROR:", error);
+        res.status(500).json({ error: "Contact failed" });
     }
 });
 
@@ -156,12 +156,23 @@ app.get("/verify-payment/:reference", async (req, res) => {
 });
 
 // ======================================================
-// 5. CHECKOUT (FIXED + DEBUG SAFE)
+// 5. CHECKOUT (FIXED EFT + BULLETPROOF LOGGING)
 // ======================================================
 app.post("/checkout", async (req, res) => {
-    const { name, email, cart, total, address, shippingOption, paymentMethod } = req.body;
+    const {
+        name,
+        email,
+        cart,
+        total,
+        address,
+        shippingOption,
+        paymentMethod
+    } = req.body;
 
-    console.log("🧾 CHECKOUT REQUEST RECEIVED:", req.body);
+    console.log("🧾 CHECKOUT RECEIVED:", req.body);
+
+    const method = (paymentMethod || "").toLowerCase();
+    console.log("💳 PAYMENT METHOD:", method);
 
     if (!name || !email || !cart || !Array.isArray(cart) || cart.length === 0 || !total || !address || !shippingOption) {
         return res.status(400).json({ error: "Invalid checkout request" });
@@ -171,12 +182,12 @@ app.post("/checkout", async (req, res) => {
     const shippingFee = shippingOption === "courier" ? 120 : 0;
     const grandTotal = total + shippingFee;
 
-    const invoiceLines = cart.map(item =>
-        `- ${item.quantity} x ${item.title}
+    const invoiceLines = cart.map(item => (
+`- ${item.quantity} x ${item.title}
   Color: ${item.color || "N/A"}
   Size: ${item.size || "N/A"}
   Price: R${(item.price * item.quantity).toFixed(2)}`
-    ).join("\n");
+    )).join("\n");
 
     const invoice = `
 🛍️ ORDER INVOICE
@@ -191,7 +202,7 @@ TOTAL: R${grandTotal.toFixed(2)}
 
 Transaction ID: ${transactionId}
 Address: ${address}
-Payment: ${paymentMethod || "Not specified"}
+Payment Method: ${method}
 `;
 
     try {
@@ -205,20 +216,24 @@ Payment: ${paymentMethod || "Not specified"}
         console.log("✅ CHECKOUT EMAIL SENT:", result);
 
         if (result?.error) {
-            console.error("❌ RESEND CHECKOUT ERROR:", result.error);
+            console.error("❌ RESEND ERROR:", result.error);
         }
 
-        res.json({ message: "Order processed", transactionId });
+        res.json({
+            message: "Order processed",
+            transactionId,
+            paymentMethod: method
+        });
 
     } catch (error) {
-        console.error("❌ CHECKOUT ERROR FULL:", error);
+        console.error("❌ CHECKOUT FAILED:", error);
         res.status(500).json({ error: "Checkout failed" });
     }
 });
 
-// ======================================================
+// ========================
 // START SERVER
-// ======================================================
+// ========================
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
 });
