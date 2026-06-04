@@ -159,35 +159,30 @@ app.get("/verify-payment/:reference", async (req, res) => {
 // 5. CHECKOUT (FIXED EFT + BULLETPROOF LOGGING)
 // ======================================================
 app.post("/checkout", async (req, res) => {
-    const {
-        name,
-        email,
-        cart,
-        total,
-        address,
-        shippingOption,
-        paymentMethod
-    } = req.body;
+    const { name, email, cart, total, address, shippingOption, paymentMethod } = req.body;
 
     console.log("🧾 CHECKOUT RECEIVED:", req.body);
 
-    const method = (paymentMethod || "").toLowerCase();
-    console.log("💳 PAYMENT METHOD:", method);
-
-    if (!name || !email || !cart || !Array.isArray(cart) || cart.length === 0 || !total || !address || !shippingOption) {
+    if (!name || !cart || !Array.isArray(cart) || cart.length === 0 || !total || !address || !shippingOption) {
         return res.status(400).json({ error: "Invalid checkout request" });
     }
+
+    // 🔥 FIX: fallback email logic
+    const recipientEmail =
+        email && email.trim().length > 0
+            ? email
+            : "thornhill_mt@hotmail.co.uk"; // fallback admin email
 
     const transactionId = `TXN-${Date.now()}`;
     const shippingFee = shippingOption === "courier" ? 120 : 0;
     const grandTotal = total + shippingFee;
 
-    const invoiceLines = cart.map(item => (
-`- ${item.quantity} x ${item.title}
+    const invoiceLines = cart.map(item =>
+        `- ${item.quantity} x ${item.title}
   Color: ${item.color || "N/A"}
   Size: ${item.size || "N/A"}
   Price: R${(item.price * item.quantity).toFixed(2)}`
-    )).join("\n");
+    ).join("\n");
 
     const invoice = `
 🛍️ ORDER INVOICE
@@ -202,35 +197,37 @@ TOTAL: R${grandTotal.toFixed(2)}
 
 Transaction ID: ${transactionId}
 Address: ${address}
-Payment Method: ${method}
+Payment: ${paymentMethod || "Not specified"}
 `;
 
     try {
+        // CUSTOMER EMAIL (ONLY IF VALID)
+        if (email && email.trim().length > 0) {
+            await resend.emails.send({
+                from: "Horti Couture <onboarding@resend.dev>",
+                to: email,
+                subject: "Your Order Invoice",
+                html: `<pre>${invoice}</pre>`,
+            });
+        }
+
+        // ADMIN ALWAYS GETS IT
         const result = await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
-            to: ADMIN_EMAIL,
+            to: "thornhill_mt@hotmail.co.uk",
             subject: `New Order ${transactionId}`,
             html: `<pre>${invoice}</pre>`,
         });
 
         console.log("✅ CHECKOUT EMAIL SENT:", result);
 
-        if (result?.error) {
-            console.error("❌ RESEND ERROR:", result.error);
-        }
-
-        res.json({
-            message: "Order processed",
-            transactionId,
-            paymentMethod: method
-        });
+        res.json({ message: "Order processed", transactionId });
 
     } catch (error) {
-        console.error("❌ CHECKOUT FAILED:", error);
+        console.error("❌ CHECKOUT ERROR:", error);
         res.status(500).json({ error: "Checkout failed" });
     }
 });
-
 // ========================
 // START SERVER
 // ========================
