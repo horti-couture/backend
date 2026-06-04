@@ -1,8 +1,8 @@
 require("dotenv").config();
 const express = require("express");
-const nodemailer = require("nodemailer");
 const cors = require("cors");
 const axios = require("axios");
+const { Resend } = require("resend");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -16,8 +16,7 @@ app.use(cors());
 // ========================
 // Debug Logs
 // ========================
-console.log("Loaded Email:", process.env.EMAIL_USER);
-console.log("Password Status:", process.env.EMAIL_PASS ? "Loaded" : "Not Loaded");
+console.log("Resend Key Loaded:", process.env.RESEND_API_KEY ? "YES" : "NO");
 
 // ========================
 // Paystack Keys
@@ -25,36 +24,16 @@ console.log("Password Status:", process.env.EMAIL_PASS ? "Loaded" : "Not Loaded"
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
 // ========================
-// ROOT TEST ROUTE (fixes Cannot GET /)
+// Resend Setup
+// ========================
+const resend = new Resend(process.env.RESEND_API_KEY);
+const ADMIN_EMAIL = "horticouturesa@gmail.com";
+
+// ========================
+// ROOT TEST ROUTE
 // ========================
 app.get("/", (req, res) => {
     res.send("✅ Horti Couture Backend is running");
-});
-
-// ========================
-// Nodemailer (FIXED SMTP CONFIG)
-// ========================
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-    connectionTimeout: 30000,
-    socketTimeout: 30000,
-});
-
-// ========================
-// SMTP STARTUP TEST (VERY IMPORTANT)
-// ========================
-transporter.verify((error, success) => {
-    if (error) {
-        console.error("❌ SMTP ERROR:", error);
-    } else {
-        console.log("✅ SMTP READY - Gmail connected successfully");
-    }
 });
 
 // ========================
@@ -68,15 +47,16 @@ app.post("/send-email", async (req, res) => {
     }
 
     try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER,
+        await resend.emails.send({
+            from: "Horti Couture <onboarding@resend.dev>",
+            to: ADMIN_EMAIL,
             subject: `New Contact Form Submission from ${name}`,
             text: `Name: ${name}\nEmail: ${email}\nMessage:\n${message}`,
         });
 
         console.log("✅ Contact email sent");
         res.json({ message: "Email sent successfully" });
+
     } catch (error) {
         console.error("❌ Contact email error:", error);
         res.status(500).json({ error: "Email failed" });
@@ -94,9 +74,9 @@ app.post("/book-service", async (req, res) => {
     }
 
     try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER,
+        await resend.emails.send({
+            from: "Horti Couture <onboarding@resend.dev>",
+            to: ADMIN_EMAIL,
             subject: `New Booking from ${name}`,
             text:
                 `Service: ${service}\n` +
@@ -107,6 +87,7 @@ app.post("/book-service", async (req, res) => {
 
         console.log("✅ Booking email sent");
         res.json({ message: "Booking sent" });
+
     } catch (error) {
         console.error("❌ Booking error:", error);
         res.status(500).json({ error: "Booking failed" });
@@ -135,6 +116,7 @@ app.post("/initialize-payment", async (req, res) => {
         );
 
         res.json(response.data);
+
     } catch (error) {
         console.error("❌ Paystack init error:", error.response?.data || error);
         res.status(500).json({ error: "Payment init failed" });
@@ -156,6 +138,7 @@ app.get("/verify-payment/:reference", async (req, res) => {
         );
 
         res.json(response.data);
+
     } catch (error) {
         console.error("❌ Verify error:", error.response?.data || error);
         res.status(500).json({ error: "Verification failed" });
@@ -202,24 +185,25 @@ Payment: ${paymentMethod}
 `;
 
     try {
-        // customer email
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
+        // Customer email
+        await resend.emails.send({
+            from: "Horti Couture <onboarding@resend.dev>",
             to: email,
             subject: "Your Order Invoice",
             text: invoice,
         });
 
-        // admin email
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: process.env.EMAIL_USER,
+        // Admin email
+        await resend.emails.send({
+            from: "Horti Couture <onboarding@resend.dev>",
+            to: ADMIN_EMAIL,
             subject: `New Order ${transactionId}`,
             text: invoice,
         });
 
         console.log("✅ Checkout complete");
         res.json({ message: "Order processed", transactionId });
+
     } catch (error) {
         console.error("❌ Checkout error:", error);
         res.status(500).json({ error: "Checkout failed" });
