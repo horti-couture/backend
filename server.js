@@ -14,30 +14,32 @@ app.use(express.json());
 app.use(cors());
 
 // ========================
-// Debug Logs
+// Debug
 // ========================
 console.log("Resend Key Loaded:", process.env.RESEND_API_KEY ? "YES" : "NO");
 
 // ========================
-// Paystack Keys
+// Paystack
 // ========================
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
 // ========================
-// Resend Setup
+// Resend
 // ========================
 const resend = new Resend(process.env.RESEND_API_KEY);
-const ADMIN_EMAIL = "horticouturesa@gmail.com";
+
+// 🔥 FORCE EVERYTHING TO YOUR VERIFIED EMAIL (IMPORTANT FIX)
+const ADMIN_EMAIL = "thornhill_mt@hotmail.co.uk";
 
 // ========================
-// ROOT TEST ROUTE
+// ROOT
 // ========================
 app.get("/", (req, res) => {
     res.send("✅ Horti Couture Backend is running");
 });
 
 // ========================
-// 1. CONTACT EMAIL
+// CONTACT EMAIL
 // ========================
 app.post("/send-email", async (req, res) => {
     const { name, email, message } = req.body;
@@ -64,14 +66,13 @@ app.post("/send-email", async (req, res) => {
         res.json({ message: "Email sent successfully" });
 
     } catch (error) {
-        console.error("❌ Contact email error:");
-        console.error(error?.response || error);
+        console.error("❌ Contact email error:", error);
         res.status(500).json({ error: "Email failed" });
     }
 });
 
 // ========================
-// 2. BOOKING EMAIL
+// BOOKING EMAIL
 // ========================
 app.post("/book-service", async (req, res) => {
     const { service, date, time, name, email, phone, address, notes } = req.body;
@@ -103,14 +104,13 @@ app.post("/book-service", async (req, res) => {
         res.json({ message: "Booking sent" });
 
     } catch (error) {
-        console.error("❌ Booking error:");
-        console.error(error?.response || error);
+        console.error("❌ Booking error:", error);
         res.status(500).json({ error: "Booking failed" });
     }
 });
 
 // ========================
-// 3. PAYSTACK INIT
+// PAYSTACK INIT
 // ========================
 app.post("/initialize-payment", async (req, res) => {
     const { email, amount } = req.body;
@@ -139,7 +139,7 @@ app.post("/initialize-payment", async (req, res) => {
 });
 
 // ========================
-// 4. PAYSTACK VERIFY
+// PAYSTACK VERIFY
 // ========================
 app.get("/verify-payment/:reference", async (req, res) => {
     try {
@@ -161,7 +161,7 @@ app.get("/verify-payment/:reference", async (req, res) => {
 });
 
 // ========================
-// 5. CHECKOUT + INVOICE
+// CHECKOUT
 // ========================
 app.post("/checkout", async (req, res) => {
     const { name, email, cart, total, address, shippingOption, paymentMethod } = req.body;
@@ -199,33 +199,21 @@ Payment: ${paymentMethod}
 `;
 
     try {
-        const customerEmail = await resend.emails.send({
-            from: "Horti Couture <onboarding@resend.dev>",
-            to: email,
-            subject: "Your Order Invoice",
-            html: `<pre>${invoice}</pre>`,
-        });
-
-        const adminEmail = await resend.emails.send({
+        await resend.emails.send({
             from: "Horti Couture <onboarding@resend.dev>",
             to: ADMIN_EMAIL,
             subject: `New Order ${transactionId}`,
             html: `<pre>${invoice}</pre>`,
         });
 
-        console.log("✅ CHECKOUT COMPLETE:", { customerEmail, adminEmail });
-
         res.json({ message: "Order processed", transactionId });
 
     } catch (error) {
-        console.error("❌ Checkout error:");
-        console.error(error?.response || error);
+        console.error("❌ Checkout error:", error);
         res.status(500).json({ error: "Checkout failed" });
     }
 });
 
-// ========================
-// START SERVER
 // ========================
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
